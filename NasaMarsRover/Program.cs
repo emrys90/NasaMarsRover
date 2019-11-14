@@ -78,10 +78,11 @@ namespace NasaMarsRover
                 string dateFormatted = _api.FormatDate(date);
                 Console.Write("Fetching " + dateFormatted + ": ");
 
-                NasaMarsRoverApi.Result result = await _api.Fetch(date);
-                if (result.Success)
+                NasaMarsRoverApi.Result apiResult = await _api.Fetch(date);
+                if (apiResult.Success)
                 {
-                    List<string> urls = GetPhotoUrls(result.Content);
+                    PhotosResult photos = JsonConvert.DeserializeObject<PhotosResult>(apiResult.Content);
+                    List<string> urls = photos.GetPhotoUrls(apiResult.Content);
                     Console.WriteLine(urls.Count + " photo urls retrieved");
 
                     await DownloadPhotos(date, urls);
@@ -93,17 +94,7 @@ namespace NasaMarsRover
             }
         }
 
-        private static List<string> GetPhotoUrls(string content)
-        {
-            List<string> photoUrls = new List<string>();
-            PhotosResult results = JsonConvert.DeserializeObject<PhotosResult>(content);
-            foreach (PhotoResult result in results.photos)
-            {
-                photoUrls.Add(result.img_src);
-            }
-
-            return photoUrls;
-        }
+        
 
         private static async Task DownloadPhotos(DateTime date, List<string> photoUrls)
         {
