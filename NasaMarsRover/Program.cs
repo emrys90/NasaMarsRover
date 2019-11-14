@@ -11,9 +11,8 @@ namespace NasaMarsRover
     class Program
     {
         const string FILENAME = "dates.txt";
-        const string API_URL = "https://api.nasa.gov/mars-photos/api/v1/rovers/curiosity/photos";
-        const string API_KEY = "ZbEgN0TodJL1RyyRy5BB1uBOwbDakUoPUqfTPQWt";
 
+        private static NasaMarsRoverApi _api;
         private static readonly string _appPath;
 
         static Program()
@@ -31,6 +30,8 @@ namespace NasaMarsRover
         {
             if (File.Exists(FILENAME))
             {
+                _api = new NasaMarsRoverApi();
+
                 List<DateTime> dates = ParseDates();
                 RetrievePhotos(dates).Wait();
             }
@@ -74,37 +75,31 @@ namespace NasaMarsRover
 
             foreach (DateTime date in dates)
             {
-                List<string> urls = await GetPhotoUrls(date);
-                await DownloadPhotos(date, urls);
-            }
-        }
+                string dateFormatted = _api.FormatDate(date);
+                Console.Write("Fetching " + dateFormatted + ": ");
 
-        private static async Task<List<string>> GetPhotoUrls(DateTime date)
-        {
-            string dateFormatted = date.ToString("yyyy-MM-dd");
-            Console.Write("Fetching " + dateFormatted + ": ");
-
-            string url = $"{API_URL}?api_key={API_KEY}&earth_date={dateFormatted}";
-
-            List<string> photoUrls = new List<string>();
-            using (HttpClient client = new HttpClient())
-            {
-                var response = await client.GetAsync(url);
-                if (response.IsSuccessStatusCode)
+                NasaMarsRoverApi.Result result = await _api.Fetch(date);
+                if (result.Success)
                 {
-                    string content = await response.Content.ReadAsStringAsync();
-                    PhotosResult results = JsonConvert.DeserializeObject<PhotosResult>(content);
-                    foreach (PhotoResult result in results.photos)
-                    {
-                        photoUrls.Add(result.img_src);
-                    }
+                    List<string> urls = GetPhotoUrls(result.Content);
+                    Console.WriteLine(urls.Count + " photo urls retrieved");
 
-                    Console.WriteLine(photoUrls.Count + " photo urls retrieved");
+                    await DownloadPhotos(date, urls);
                 }
                 else
                 {
                     Console.WriteLine("Failed to retrieve image results");
                 }
+            }
+        }
+
+        private static List<string> GetPhotoUrls(string content)
+        {
+            List<string> photoUrls = new List<string>();
+            PhotosResult results = JsonConvert.DeserializeObject<PhotosResult>(content);
+            foreach (PhotoResult result in results.photos)
+            {
+                photoUrls.Add(result.img_src);
             }
 
             return photoUrls;
